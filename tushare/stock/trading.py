@@ -123,7 +123,7 @@ def _parsing_dayprice_json(pageNum=1):
     df = pd.DataFrame(pd.read_json(js, dtype={'code':object}),
                       columns=ct.DAY_TRADING_COLUMNS)
     df = df.drop('symbol', axis=1)
-    df = df.ix[df.volume > 0]
+#     df = df.ix[df.volume > 0]
     return df
 
 
@@ -155,7 +155,7 @@ def get_tick_data(code=None, date=None, retry_count=3, pause=0.001):
                                 date, symbol))
             lines = urlopen(re, timeout=10).read()
             lines = lines.decode('GBK') 
-            if len(lines) < 100:
+            if len(lines) < 20:
                 return None
             df = pd.read_table(StringIO(lines), names=ct.TICK_COLUMNS,
                                skiprows=[0])      
@@ -287,7 +287,7 @@ def get_today_all():
     return
     -------
       DataFrame
-           属性：代码，名称，涨跌幅，现价，开盘价，最高价，最低价，最日收盘价，成交量，换手率
+           属性：代码，名称，涨跌幅，现价，开盘价，最高价，最低价，最日收盘价，成交量，换手率，成交额，市盈率，市净率，总市值，流通市值
     """
     ct._write_head()
     df = _parsing_dayprice_json(1)
@@ -413,7 +413,10 @@ def get_h_data(code, start=None, end=None, autype='qfq',
             ct._write_console()
             df = _parse_fq_data(_get_index_url(index, code, qt), index,
                                 retry_count, pause)
-            data = data.append(df, ignore_index=True)
+            if df is None:  # 可能df为空，退出循环
+                break
+            else:
+                data = data.append(df, ignore_index=True)
     if len(data) == 0 or len(data[(data.date>=start)&(data.date<=end)]) == 0:
         return None
     data = data.drop_duplicates('date')
@@ -439,7 +442,8 @@ def get_h_data(code, start=None, end=None, autype='qfq',
             df = _parase_fq_factor(code, start, end)
             df = df.drop_duplicates('date')
             df = df.sort('date', ascending=False)
-            frow = df.head(1)
+            firstDate = data.head(1)['date']
+            frow = df[df.date == firstDate[0]]
             rt = get_realtime_quotes(code)
             if rt is None:
                 return None
@@ -531,6 +535,9 @@ def _parse_fq_data(url, index, retry_count, pause):
             if df['date'].dtypes == np.object:
                 df['date'] = df['date'].astype(np.datetime64)
             df = df.drop_duplicates('date')
+        except ValueError as e:
+            # 时间较早，已经读不到数据
+            return None
         except Exception as e:
             print(e)
         else:
@@ -566,7 +573,7 @@ def get_index():
     df['change'] = (df['close'] / df['preclose'] - 1 ) * 100
     df['amount'] = df['amount'] / 100000000
     df['change'] = df['change'].map(ct.FORMAT)
-    df['amount'] = df['amount'].map(ct.FORMAT)
+    df['amount'] = df['amount'].map(ct.FORMAT4)
     df = df[ct.INDEX_COLS]
     df['code'] = df['code'].map(lambda x:str(x).zfill(6))
     df['change'] = df['change'].astype(float)
@@ -621,4 +628,3 @@ def _code_to_symbol(code):
             return ''
         else:
             return 'sh%s'%code if code[:1] in ['5', '6', '9'] else 'sz%s'%code
-
