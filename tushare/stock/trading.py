@@ -148,8 +148,6 @@ def get_tick_data(code=None, date=None, retry_count=3, pause=0.001,
         DataFrame 当日所有股票交易数据(DataFrame)
               属性:成交时间、成交价格、价格变动，成交手、成交金额(元)，买卖类型
     """
-    if code is None or len(code)!=6 or date is None:
-        return None
     if (src.strip() not in ct.TICK_SRCS):
         print(ct.TICK_SRC_ERROR)
         return None
@@ -759,6 +757,38 @@ def get_hists(symbols, start=None, end=None,
         return df
     else:
         return None
+  
+  
+def get_day_all(date=None):
+    """
+    获取每日收盘行情
+    Parameters:
+    -------------
+    date:交易日期，格式:YYYY-MM-DD
+    
+    Return:
+    -------------
+    DataFrame
+    code 代码, name 名称, p_change 涨幅%,
+    price 现价, change 涨跌, open 今开, high 最高,
+    low 最低, preprice 昨收, pe 市盈(动),
+    volratio 量比, turnover 换手%, range 振幅%%,
+    volume 总量, selling 内盘, buying 外盘,
+    amount 总金额, totals 总股本(万), industry 细分行业,
+    area 地区, floats 流通股本(万), fvalues 流通市值,
+    abvalues AB股总市值, avgprice 均价, strength 强弱度%,
+    activity 活跃度, avgturnover 笔换手, attack 攻击波%,
+    interval3 近3月涨幅 ，interval 近6月涨幅
+    """
+    wdate = du.last_tddate() if date is None else date
+    wdate = wdate.replace('-', '')
+    if wdate < '20170614':
+        return None
+    datepre = '' if date is None else wdate[0:4] + wdate[4:6] + '/'
+    df = pd.read_csv(ct.ALL_DAY_FILE%(datepre, \
+                                      'hq' if date is None else wdate), \
+                                      dtype={'code':'object'})
+    return df
     
     
 def _random(n=13):
@@ -776,7 +806,7 @@ def _code_to_symbol(code):
         return ct.INDEX_LIST[code]
     else:
         if len(code) != 6 :
-            return ''
+            return code
         else:
             return 'sh%s'%code if code[:1] in ['5', '6', '9'] else 'sz%s'%code
 
